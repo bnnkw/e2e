@@ -9,28 +9,12 @@ driver:
     height: 1080
 
 vars:
-  root: https://github.com
-  repo-name-css: 'strong[itemprop=name] > a'
-
-tasks:
-  open-repo:
-    arg_names:
-      - owner
-      - name
-    steps:
-      - !goto '{root}/{owner}/{name}'
+  base_url: http://e2e-apache
 
 scenarios:
-  scenario1:
-    name: should pass
+  apache_default:
+    name: Apache default page should show "It works!"
     steps:
-      - !task_run { id: open-repo, args: [ tkr66, e2e ] }
-      - !assert_eq { kind: text, expected: e2e, selector: '{repo-name-css}' }
-      - !screen_shot 'img/repo.png'
-
-  scenario2:
-    name: should fail
-    steps:
-      - !task_run { id: open-repo, args: [ tkr66, e2e ] }
-      - !assert_eq { kind: text, expected: should fail, selector: '{repo-name-css}' }
-      - !screen_shot 'img/repo.png'
+      - !goto '{base_url}'
+      - !assert_eq { kind: text, expected: 'It works!', selector: 'body' }
+      - !screen_shot 'img/apache.png'

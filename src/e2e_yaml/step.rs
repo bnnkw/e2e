@@ -81,9 +81,8 @@ pub enum Step {
         args: Option<Vec<String>>,
     },
     AssertEq {
-        kind: ValueKind,
         expected: String,
-        selector: String,
+        target: AssertTarget,
     },
     Select {
         selector: String,
@@ -91,11 +90,17 @@ pub enum Step {
         value: String,
     },
 }
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AssertTarget {
+    Element { selector: String, attr: Attribute },
+    Url,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ValueKind {
+pub enum Attribute {
     Text,
     Id,
     Class,
@@ -148,14 +153,9 @@ impl Step {
                     }
                 }
             }
-            Step::AssertEq {
-                kind,
-                expected,
-                selector,
-            } => Step::AssertEq {
-                kind: kind.clone(),
+            Step::AssertEq { expected, target } => Step::AssertEq {
                 expected: expected.replace(k, value),
-                selector: selector.replace(k, value),
+                target: target.clone(),
             },
             Step::Select {
                 selector,
@@ -203,14 +203,9 @@ impl Step {
                     }
                 }
             }
-            Step::AssertEq {
-                kind,
-                expected,
-                selector,
-            } => Step::AssertEq {
-                kind: kind.clone(),
+            Step::AssertEq { expected, target } => Step::AssertEq {
                 expected: expand(expected, vars),
-                selector: expand(selector, vars),
+                target: target.clone(),
             },
             Step::Select {
                 selector,
@@ -307,23 +302,36 @@ impl Step {
                     Box::pin(ele.run(driver, config)).await?;
                 }
             }
-            Step::AssertEq {
-                kind,
-                expected,
-                selector,
-            } => {
-                let elem = driver.find(By::Css(selector)).await?;
-                let actual = match kind {
-                    ValueKind::Text => elem.text().await?,
-                    ValueKind::Id => elem.id().await?.unwrap_or("".to_string()),
-                    ValueKind::Class => elem.class_name().await?.unwrap_or("".to_string()),
-                };
-                if expected != &actual {
-                    return Err(StepError {
-                        kind: StepErrorKind::AssertFailed(expected.to_string(), actual),
-                    });
+            Step::AssertEq { expected, target } => match target {
+                AssertTarget::Element { selector, attr } => {
+                    let elem = driver.find(By::Css(selector)).await?;
+                    let actual = match attr {
+                        Attribute::Text => elem.text().await?,
+                        Attribute::Id => elem.id().await?.unwrap_or("".to_string()),
+                        Attribute::Class => elem.class_name().await?.unwrap_or("".to_string()),
+                    };
+                    if expected == &actual {
+                        return Ok(());
+                    } else {
+                        return Err(StepError {
+                            kind: StepErrorKind::AssertFailed(expected.to_string(), actual),
+                        });
+                    }
                 }
-            }
+                AssertTarget::Url => {
+                    let url = driver.current_url().await?;
+                    if expected == url.as_str() {
+                        return Ok(());
+                    } else {
+                        return Err(StepError {
+                            kind: StepErrorKind::AssertFailed(
+                                expected.to_string(),
+                                url.to_string(),
+                            ),
+                        });
+                    };
+                }
+            },
             Step::Select {
                 selector,
                 kind,
@@ -375,7 +383,8 @@ mod step_tests {
  - !screen_shot '{app}'
  - !wait_displayed { selector: '{app}', timeout: 3000, interval: 1000 }
  - !task_run { id: login, args: [ 'admin', '{app}' ] }
- - !assert_eq { kind: text, expected: '{app}', selector: '{app}' }
+ - !assert_eq { expected: '{app}', target: url }
+ - !assert_eq { expected: '{app}', target: !element { selector: '{app}', attr: id } }
  - !select { selector: '{app}', kind: value, value: '{app}' }
 ";
         let vars = Vars(IndexMap::from([
@@ -393,6 +402,7 @@ mod step_tests {
         let s7 = &expanded_steps[6];
         let s8 = &expanded_steps[7];
         let s9 = &expanded_steps[8];
+        let s10 = &expanded_steps[9];
         assert_eq!(Step::Goto("http://localhost".to_string()), *s1);
         assert_eq!(Step::Click("e2e".to_string()), *s2);
         assert_eq!(Step::Focus("e2e".to_string()), *s3);
@@ -421,11 +431,20 @@ mod step_tests {
         );
         assert_eq!(
             Step::AssertEq {
-                kind: ValueKind::Text,
                 expected: "e2e".to_string(),
-                selector: "e2e".to_string(),
+                target: AssertTarget::Url,
             },
             *s8
+        );
+        assert_eq!(
+            Step::AssertEq {
+                expected: "e2e".to_string(),
+                target: AssertTarget::Element {
+                    selector: "{app}".to_string(),
+                    attr: Attribute::Id,
+                },
+            },
+            *s9
         );
         assert_eq!(
             Step::Select {
@@ -433,7 +452,7 @@ mod step_tests {
                 kind: SelectKind::Value,
                 value: "e2e".to_string(),
             },
-            *s9
+            *s10
         );
     }
 }

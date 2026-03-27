@@ -96,6 +96,10 @@ pub enum Step {
         selector: String,
         file: PathBuf,
     },
+    SwitchToWindow {
+        idx: u64,
+        maximum: Option<bool>,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -194,6 +198,7 @@ impl Step {
                 selector: selector.replace(k, value),
                 file: file.clone(),
             },
+            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
         }
     }
 
@@ -254,6 +259,7 @@ impl Step {
                 selector: expand(selector, vars),
                 file: file.clone(),
             },
+            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
         }
     }
 
@@ -406,6 +412,19 @@ impl Step {
             Step::UploadFile { selector, file } => {
                 let elem = driver.find(By::Css(selector)).await?;
                 elem.send_keys(file.as_path().to_str().unwrap()).await?;
+            }
+            Step::SwitchToWindow { idx, maximum } => {
+                let handles = driver.windows().await?;
+                let handle = handles.get(*idx as usize).ok_or_else(|| {
+                    WebDriverError::NotFound(
+                        format!("window index {} out of range (total: {})", idx, handles.len()),
+                        String::new(),
+                    )
+                })?;
+                driver.switch_to_window(handle.clone()).await?;
+                if maximum == &Some(true) {
+                    driver.maximize_window().await?;
+                }
             }
         }
         Ok(())

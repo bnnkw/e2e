@@ -67,7 +67,8 @@ pub enum Step {
     Focus(String),
     SendKeys {
         selector: String,
-        value: String,
+        #[serde(flatten)]
+        input: SendKeysInput,
     },
     ScreenShot(String),
     WaitDisplayed {
@@ -89,6 +90,20 @@ pub enum Step {
         kind: SelectKind,
         value: String,
     },
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum SendKeysInput {
+    Value { value: String },
+    Code { code: KeyCode },
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+pub enum KeyCode {
+    Tab,
+    Enter,
+    Space,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -121,12 +136,14 @@ impl Step {
             Step::Goto(url) => Step::Goto(url.replace(k, value)),
             Step::Click(selector) => Step::Click(selector.replace(k, value)),
             Step::Focus(selector) => Step::Focus(selector.replace(k, value)),
-            Step::SendKeys {
-                selector,
-                value: val,
-            } => Step::SendKeys {
+            Step::SendKeys { selector, input } => Step::SendKeys {
                 selector: selector.replace(k, value),
-                value: val.replace(k, value),
+                input: match input {
+                    SendKeysInput::Value { value: val } => SendKeysInput::Value {
+                        value: val.replace(k, value),
+                    },
+                    SendKeysInput::Code { code } => SendKeysInput::Code { code: code.clone() },
+                },
             },
             Step::ScreenShot(path) => Step::ScreenShot(path.replace(k, value)),
             Step::WaitDisplayed {
@@ -174,9 +191,14 @@ impl Step {
             Step::Goto(url) => Step::Goto(expand(url, vars)),
             Step::Click(selector) => Step::Click(expand(selector, vars)),
             Step::Focus(selector) => Step::Focus(expand(selector, vars)),
-            Step::SendKeys { selector, value } => Step::SendKeys {
+            Step::SendKeys { selector, input } => Step::SendKeys {
                 selector: expand(selector, vars),
-                value: expand(value, vars),
+                input: match input {
+                    SendKeysInput::Value { value } => SendKeysInput::Value {
+                        value: expand(value, vars),
+                    },
+                    SendKeysInput::Code { code } => SendKeysInput::Code { code: code.clone() },
+                },
             },
             Step::ScreenShot(path) => Step::ScreenShot(expand(path, vars)),
             Step::WaitDisplayed {
@@ -234,10 +256,22 @@ impl Step {
                 let elem = driver.find(By::Css(selector)).await?;
                 elem.focus().await?;
             }
-            Step::SendKeys { selector, value } => {
+            Step::SendKeys { selector, input } => {
                 let elem = driver.find(By::Css(selector)).await?;
-                elem.clear().await?;
-                elem.send_keys(value).await?;
+                match input {
+                    SendKeysInput::Value { value } => {
+                        elem.clear().await?;
+                        elem.send_keys(value).await?;
+                    }
+                    SendKeysInput::Code { code } => {
+                        let key = match code {
+                            KeyCode::Tab => thirtyfour::Key::Tab,
+                            KeyCode::Enter => thirtyfour::Key::Enter,
+                            KeyCode::Space => thirtyfour::Key::Space,
+                        };
+                        elem.send_keys(key).await?;
+                    }
+                }
             }
             Step::ScreenShot(file_name) => {
                 let p = Path::new(file_name);
@@ -409,7 +443,9 @@ mod step_tests {
         assert_eq!(
             Step::SendKeys {
                 selector: "e2e".to_string(),
-                value: "e2e".to_string(),
+                input: SendKeysInput::Value {
+                    value: "e2e".to_string(),
+                },
             },
             *s4
         );

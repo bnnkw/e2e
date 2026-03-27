@@ -2,7 +2,7 @@ use indexmap::{IndexMap, IndexSet};
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::step::Step;
+use super::step::{SendKeysInput, Step};
 
 #[derive(Debug, PartialEq)]
 pub struct TaskError {
@@ -131,11 +131,15 @@ login:
             vec![
                 Step::SendKeys {
                     selector: "#input".to_string(),
-                    value: "hello world".to_string(),
+                    input: SendKeysInput::Value {
+                        value: "hello world".to_string(),
+                    },
                 },
                 Step::SendKeys {
                     selector: "hello world".to_string(),
-                    value: "#input".to_string(),
+                    input: SendKeysInput::Value {
+                        value: "#input".to_string(),
+                    },
                 },
             ],
             expanded_t1

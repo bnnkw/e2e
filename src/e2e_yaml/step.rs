@@ -90,6 +90,7 @@ pub enum Step {
         kind: SelectKind,
         value: String,
     },
+    Wait(u64),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -183,6 +184,7 @@ impl Step {
                 kind: kind.clone(),
                 value: val.replace(k, value),
             },
+            Step::Wait(millis) => Step::Wait(*millis),
         }
     }
 
@@ -238,6 +240,7 @@ impl Step {
                 kind: kind.clone(),
                 value: expand(value, vars),
             },
+            Step::Wait(millis) => Step::Wait(*millis),
         }
     }
 
@@ -383,6 +386,9 @@ impl Step {
                     }
                 };
                 option.click().await?;
+            }
+            Step::Wait(millis) => {
+                thirtyfour::support::sleep(std::time::Duration::from_millis(*millis)).await;
             }
         }
         Ok(())

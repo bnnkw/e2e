@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::e2e_yaml::Vars;
@@ -91,6 +92,10 @@ pub enum Step {
         value: String,
     },
     Wait(u64),
+    UploadFile {
+        selector: String,
+        file: PathBuf,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -185,6 +190,10 @@ impl Step {
                 value: val.replace(k, value),
             },
             Step::Wait(millis) => Step::Wait(*millis),
+            Step::UploadFile { selector, file } => Step::UploadFile {
+                selector: selector.replace(k, value),
+                file: file.clone(),
+            },
         }
     }
 
@@ -241,6 +250,10 @@ impl Step {
                 value: expand(value, vars),
             },
             Step::Wait(millis) => Step::Wait(*millis),
+            Step::UploadFile { selector, file } => Step::UploadFile {
+                selector: expand(selector, vars),
+                file: file.clone(),
+            },
         }
     }
 
@@ -389,6 +402,10 @@ impl Step {
             }
             Step::Wait(millis) => {
                 thirtyfour::support::sleep(std::time::Duration::from_millis(*millis)).await;
+            }
+            Step::UploadFile { selector, file } => {
+                let elem = driver.find(By::Css(selector)).await?;
+                elem.send_keys(file.as_path().to_str().unwrap()).await?;
             }
         }
         Ok(())

@@ -85,6 +85,12 @@ pub enum Step {
         expected: String,
         selector: String,
     },
+    Select {
+        selector: String,
+        kind: SelectKind,
+        value: String,
+    },
+}
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -93,6 +99,13 @@ pub enum ValueKind {
     Text,
     Id,
     Class,
+}
+
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectKind {
+    Value,
+    Text,
 }
 
 impl Step {
@@ -144,6 +157,15 @@ impl Step {
                 expected: expected.replace(k, value),
                 selector: selector.replace(k, value),
             },
+            Step::Select {
+                selector,
+                kind,
+                value: val,
+            } => Step::Select {
+                selector: selector.replace(k, value),
+                kind: kind.clone(),
+                value: val.replace(k, value),
+            },
         }
     }
 
@@ -189,6 +211,15 @@ impl Step {
                 kind: kind.clone(),
                 expected: expand(expected, vars),
                 selector: expand(selector, vars),
+            },
+            Step::Select {
+                selector,
+                kind,
+                value,
+            } => Step::Select {
+                selector: expand(selector, vars),
+                kind: kind.clone(),
+                value: expand(value, vars),
             },
         }
     }
@@ -293,6 +324,24 @@ impl Step {
                     });
                 }
             }
+            Step::Select {
+                selector,
+                kind,
+                value,
+            } => {
+                let elem = driver.find(By::Css(selector)).await?;
+                let option = match kind {
+                    SelectKind::Value => {
+                        elem.find(By::Css(&format!("option[value='{}']", value)))
+                            .await?
+                    }
+                    SelectKind::Text => {
+                        elem.find(By::XPath(&format!(".//option[text()='{}']", value)))
+                            .await?
+                    }
+                };
+                option.click().await?;
+            }
         }
         Ok(())
     }
@@ -327,6 +376,7 @@ mod step_tests {
  - !wait_displayed { selector: '{app}', timeout: 3000, interval: 1000 }
  - !task_run { id: login, args: [ 'admin', '{app}' ] }
  - !assert_eq { kind: text, expected: '{app}', selector: '{app}' }
+ - !select { selector: '{app}', kind: value, value: '{app}' }
 ";
         let vars = Vars(IndexMap::from([
             ("url".to_string(), "http://localhost".to_string()),
@@ -342,6 +392,7 @@ mod step_tests {
         let s6 = &expanded_steps[5];
         let s7 = &expanded_steps[6];
         let s8 = &expanded_steps[7];
+        let s9 = &expanded_steps[8];
         assert_eq!(Step::Goto("http://localhost".to_string()), *s1);
         assert_eq!(Step::Click("e2e".to_string()), *s2);
         assert_eq!(Step::Focus("e2e".to_string()), *s3);
@@ -375,6 +426,14 @@ mod step_tests {
                 selector: "e2e".to_string(),
             },
             *s8
+        );
+        assert_eq!(
+            Step::Select {
+                selector: "e2e".to_string(),
+                kind: SelectKind::Value,
+                value: "e2e".to_string(),
+            },
+            *s9
         );
     }
 }

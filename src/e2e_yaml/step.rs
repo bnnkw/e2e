@@ -100,6 +100,11 @@ pub enum Step {
         idx: u64,
         maximum: Option<bool>,
     },
+    ClickAndWait {
+        selector: String,
+        timeout: u64,
+        interval: u64,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -199,6 +204,15 @@ impl Step {
                 file: file.clone(),
             },
             Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
+            Step::ClickAndWait {
+                selector,
+                timeout,
+                interval,
+            } => Step::ClickAndWait {
+                selector: selector.replace(k, value),
+                timeout: *timeout,
+                interval: *interval,
+            },
         }
     }
 
@@ -260,6 +274,15 @@ impl Step {
                 file: file.clone(),
             },
             Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
+            Step::ClickAndWait {
+                selector,
+                timeout,
+                interval,
+            } => Step::ClickAndWait {
+                selector: expand(selector, vars),
+                timeout: *timeout,
+                interval: *interval,
+            },
         }
     }
 
@@ -424,6 +447,48 @@ impl Step {
                 driver.switch_to_window(handle.clone()).await?;
                 if maximum == &Some(true) {
                     driver.maximize_window().await?;
+                }
+            }
+            Step::ClickAndWait {
+                selector,
+                timeout,
+                interval,
+            } => {
+                // To detect the page reloaded by the marker is gone.
+                driver
+                    .execute("window.__e2e_nav_marker = true;", vec![])
+                    .await?;
+                driver.find(By::Css(selector)).await?.click().await?;
+
+                let deadline =
+                    std::time::Instant::now() + Duration::from_millis(*timeout);
+                let interval = Duration::from_millis(*interval);
+                loop {
+                    if std::time::Instant::now() > deadline {
+                        return Err(WebDriverError::Timeout(format!(
+                            "click_and_wait timed out: selector '{}'",
+                            selector
+                        ))
+                        .into());
+                    }
+                    let result = driver
+                        .execute(
+                            "return (typeof window.__e2e_nav_marker === 'undefined') && document.readyState === 'complete';",
+                            vec![],
+                        )
+                        .await;
+                    match result {
+                        Ok(ret) => {
+                            if ret.json().as_bool().unwrap_or(false) {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            // keep polling
+                            eprintln!("javascript execution failed: {e}");
+                        }
+                    }
+                    thirtyfour::support::sleep(interval).await;
                 }
             }
         }

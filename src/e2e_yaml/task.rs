@@ -2,7 +2,7 @@ use indexmap::{IndexMap, IndexSet};
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::step::{SendKeysInput, Step};
+use super::step::Step;
 
 #[derive(Debug, PartialEq)]
 pub struct TaskError {
@@ -111,6 +111,7 @@ impl Task {
 #[cfg(test)]
 mod task_tests {
     use super::*;
+    use crate::e2e_yaml::step::SendKeysInput;
 
     #[test]
     fn test_expand_args() {

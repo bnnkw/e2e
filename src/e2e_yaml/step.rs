@@ -425,11 +425,11 @@ impl Step {
                 let elem = driver.find(By::Css(selector)).await?;
                 let option = match kind {
                     SelectKind::Value => {
-                        elem.find(By::Css(&format!("option[value='{}']", value)))
+                        elem.find(By::Css(format!("option[value='{}']", value)))
                             .await?
                     }
                     SelectKind::Text => {
-                        elem.find(By::XPath(&format!(".//option[text()='{}']", value)))
+                        elem.find(By::XPath(format!(".//option[text()='{}']", value)))
                             .await?
                     }
                 };

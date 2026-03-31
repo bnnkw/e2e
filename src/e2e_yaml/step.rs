@@ -99,7 +99,7 @@ pub enum Step {
         file: PathBuf,
     },
     SwitchToWindow {
-        idx: u64,
+        index: u64,
         maximum: Option<bool>,
     },
     ClickAndWait {
@@ -205,8 +205,8 @@ impl Step {
                 selector: selector.replace(k, value),
                 file: file.clone(),
             },
-            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow {
-                idx: *idx,
+            Step::SwitchToWindow { index, maximum } => Step::SwitchToWindow {
+                index: *index,
                 maximum: *maximum,
             },
             Step::ClickAndWait {
@@ -278,8 +278,8 @@ impl Step {
                 selector: expand(selector, vars),
                 file: file.clone(),
             },
-            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow {
-                idx: *idx,
+            Step::SwitchToWindow { index, maximum } => Step::SwitchToWindow {
+                index: *index,
                 maximum: *maximum,
             },
             Step::ClickAndWait {
@@ -444,13 +444,13 @@ impl Step {
                 let elem = driver.find(By::Css(selector)).await?;
                 elem.send_keys(file.as_path().to_str().unwrap()).await?;
             }
-            Step::SwitchToWindow { idx, maximum } => {
+            Step::SwitchToWindow { index, maximum } => {
                 let handles = driver.windows().await?;
-                let handle = handles.get(*idx as usize).ok_or_else(|| {
+                let handle = handles.get(*index as usize).ok_or_else(|| {
                     WebDriverError::NotFound(
                         format!(
                             "window index {} out of range (total: {})",
-                            idx,
+                            index,
                             handles.len()
                         ),
                         String::new(),

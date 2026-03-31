@@ -203,7 +203,10 @@ impl Step {
                 selector: selector.replace(k, value),
                 file: file.clone(),
             },
-            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
+            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow {
+                idx: *idx,
+                maximum: *maximum,
+            },
             Step::ClickAndWait {
                 selector,
                 timeout,
@@ -273,7 +276,10 @@ impl Step {
                 selector: expand(selector, vars),
                 file: file.clone(),
             },
-            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow { idx: *idx, maximum: *maximum },
+            Step::SwitchToWindow { idx, maximum } => Step::SwitchToWindow {
+                idx: *idx,
+                maximum: *maximum,
+            },
             Step::ClickAndWait {
                 selector,
                 timeout,
@@ -440,7 +446,11 @@ impl Step {
                 let handles = driver.windows().await?;
                 let handle = handles.get(*idx as usize).ok_or_else(|| {
                     WebDriverError::NotFound(
-                        format!("window index {} out of range (total: {})", idx, handles.len()),
+                        format!(
+                            "window index {} out of range (total: {})",
+                            idx,
+                            handles.len()
+                        ),
                         String::new(),
                     )
                 })?;
@@ -460,8 +470,7 @@ impl Step {
                     .await?;
                 driver.find(By::Css(selector)).await?.click().await?;
 
-                let deadline =
-                    std::time::Instant::now() + Duration::from_millis(*timeout);
+                let deadline = std::time::Instant::now() + Duration::from_millis(*timeout);
                 let interval = Duration::from_millis(*interval);
                 loop {
                     if std::time::Instant::now() > deadline {

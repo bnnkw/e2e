@@ -14,10 +14,12 @@ use thirtyfour::By;
 use super::E2eYaml;
 use crate::e2e_yaml::var::parse_var_names;
 
+#[derive(Debug)]
 pub struct StepError {
     pub kind: StepErrorKind,
 }
 
+#[derive(Debug)]
 pub enum StepErrorKind {
     WebDriverError(WebDriverError),
     DirectoryCreateFailed(std::io::Error),
